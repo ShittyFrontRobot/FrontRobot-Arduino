@@ -1,10 +1,6 @@
 #include <Arduino.h>
 
 
-enum MotorState {
-    Stop, Break, Speed
-};
-
 template<typename T>
 class Controller {
 public:
@@ -32,168 +28,106 @@ public:
     }
 };
 
-#define L298N_SLOT_A 0x0
-#define L298N_SLOT_B 0x1
 
-class L298N {
-private:
-    uint8_t in1, in2, in3, in4;
-public:
-    L298N(uint8_t _in1,
-          uint8_t _in2,
-          uint8_t _in3,
-          uint8_t _in4)
-            : in1(_in1),
-              in2(_in2),
-              in3(_in3),
-              in4(_in4) {}
+template<uint8_t a, uint8_t b>
+struct motor_core_t {
 
-    void init() {
-        pinMode(in1, OUTPUT);
-        pinMode(in2, OUTPUT);
-        pinMode(in3, OUTPUT);
-        pinMode(in4, OUTPUT);
-        motor_a_break();
-        motor_b_break();
+    motor_core_t() = delete;
+
+    ~motor_core_t() = delete;
+
+    void state_stop() {
+        digitalWrite(a, LOW);
+        digitalWrite(b, LOW);
     }
 
-    void motor_a_stop() {
-        digitalWrite(in1, LOW);
-        digitalWrite(in2, LOW);
+    void state_break() {
+        digitalWrite(a, HIGH);
+        digitalWrite(b, HIGH);
     }
 
-    void motor_a_break() {
-        digitalWrite(in1, HIGH);
-        digitalWrite(in2, HIGH);
-    }
-
-    void motor_a_pwm(int value) {
+    void pwm(int value) {
         if (value > 0) {
-            analogWrite(in1, value);
-            analogWrite(in2, 0);
+            analogWrite(a, value);
+            analogWrite(b, 0);
         } else {
-            analogWrite(in1, 0);
-            analogWrite(in2, value);
+            analogWrite(a, 0);
+            analogWrite(b, -value);
         }
     }
-
-    void motor_b_pwm(int value) {
-        if (value > 0) {
-            analogWrite(in3, value);
-            analogWrite(in4, 0);
-        } else {
-            analogWrite(in3, 0);
-            analogWrite(in4, value);
-        }
-    }
-
-    void motor_b_stop() {
-        digitalWrite(in3, LOW);
-        digitalWrite(in4, LOW);
-    }
-
-    void motor_b_break() {
-        digitalWrite(in3, HIGH);
-        digitalWrite(in4, HIGH);
-    }
-
-
 };
 
-class Motor {
+//
+//enum MotorState {
+//    Stop, Break, Speed
+//};
+//MotorState from_raw(uint8_t data) {
+//    MotorState state = Stop;
+//    switch (data) {
+//        case 0x0:
+//            state = Stop;
+//            break;
+//        case 0x1:
+//            state = Break;
+//            break;
+//        case 0x2:
+//            state = Speed;
+//            break;
+//        default:
+//            break;
+//    }
+//    return state;
+//}
 
-private:
-    double power{};
-    uint8_t slot;
-    L298N *driver;
-    // TODO encoder
-public:
-    Motor(L298N _driver, uint8_t _slot) : driver(&_driver), slot(_slot) {
-
-    }
-
-    MotorState state = Break;
-    int16_t target_speed{};
-
-    void set_power(double _power) {
-        if (_power > 1.0 || _power < -1.0)
-            return;
-        power = _power;
-        if (slot == L298N_SLOT_A)
-            driver->motor_a_pwm((int) (power * 255));
-        else driver->motor_b_pwm((int) (power * 255));
-    }
-
-    double get_power() {
-        return power;
-    }
-
-};
-
-MotorState from_raw(uint8_t data) {
-    MotorState state = Stop;
-    switch (data) {
-        case 0x0:
-            state = Stop;
-            break;
-        case 0x1:
-            state = Break;
-            break;
-        case 0x2:
-            state = Speed;
-            break;
-        default:
-            break;
-    }
-    return state;
-}
-
-#define SPEED_HEAD 0xA1
-#define SPEED_SIZE 14
-#define STATE_HEAD 0xA3
+#define TYPE_SPEED 0xA1
+#define SPEED_SIZE 26
+#define TYPE_STATE 0xA3
 #define STATE_SIZE 8
+
+using chassis_lf = motor_core_t<0, 1>;
+using chassis_lb = motor_core_t<0, 1>;
+using chassis_rf = motor_core_t<0, 1>;
+using chassis_rb = motor_core_t<0, 1>;
+
+void speed_callback(const float *);
 
 
 void decode_from_nano(HardwareSerial serial) {
-    // 拿帧头
-    int head = serial.read();
-    if (head == SPEED_HEAD) {
-        uint8_t buf[SPEED_SIZE - 1];
-        serial.readBytes(buf, SPEED_SIZE - 1);
-        short speeds[6];
-        int k = 0;
-        // 合并两字节
-        for (int i = 0; i < SPEED_SIZE - 2; i += 2)
-            speeds[k++] = (uint16_t) buf[i] & ((uint16_t) buf[i + 1] << 8);
-
-        // 校验
-        auto check = speeds[0];
-        for (int i = 1; i < 6; i++) {
-            check ^= speeds[i];
+    static uint8_t buffer[64];
+    static size_t ptr = 0;
+    if (ptr == 0)
+        while (true) {
+            auto byte = serial.read();
+            if (byte == 0xff)
+                break;
+            else if (byte == -1)
+                return;
         }
 
-        if (check != buf[SPEED_SIZE - 2])return;
-        // TODO assign
-    } else if (head == STATE_HEAD) {
-        uint8_t buf[STATE_SIZE - 1];
-        serial.readBytes(buf, STATE_SIZE - 1);
-        MotorState states[6];
-        for (int i = 0; i < 6; i++)
-            states[i] = from_raw(buf[i]);
-
-        uint8_t check = states[0];
-
-        for (int i = 1; i < 6; i++) {
-            check ^= states[i];
+    buffer[0] = serial.read();
+    switch (buffer[0]) {
+        case TYPE_SPEED: {
+            ptr += serial.readBytes(buffer + 1, SPEED_SIZE - ptr);
+            if (ptr < SPEED_SIZE)
+                return;
+            auto size = ptr;
+            ptr = 0;
+            uint8_t sum = 0;
+            for (auto i = size - 2; i >= 0; --i)
+                sum ^= buffer[i];
+            if (sum != buffer[size - 1])
+                return;
+            float speeds[4];
+            memcpy(buffer + 1, speeds, 4 * sizeof(float));
+            speed_callback(speeds);
+            break;
         }
-
-        if (check != buf[STATE_SIZE - 2])return;
-        // TODO assign
+        case TYPE_STATE:
+            break;
     }
 }
 
 void setup() {
-
     Serial.begin(9600);
 }
 
