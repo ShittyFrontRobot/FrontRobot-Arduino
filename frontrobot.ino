@@ -125,6 +125,8 @@ void state_callback(const motor_state_t *);
 
 void reset_callback();
 
+void print_buf(uint8_t *buf, size_t size);
+
 template<typename _R>
 struct read_result_t {
     _R data;
@@ -140,37 +142,51 @@ struct read_result_t {
 
 template<size_t size, typename _R>
 read_result_t<_R> try_read(HardwareSerial serial, uint8_t *buffer, size_t ptr, _R(f)()) {
+    Serial.println("=======READING START=======");
     // 尝试读对应长度
+    Serial.print("I need read ");
+    Serial.print(size - ptr);
+    Serial.println(" byte(s) this time");
     ptr += serial.readBytes(buffer + 1, size - ptr);
     // 没读完下次再说
     if (ptr < size) {
-        Serial.print("I have read ");
+        Serial.print("I've got ");
         Serial.print(ptr);
-        Serial.print(", but it should be ");
+        Serial.print(" byte(s) so far, but it should be ");
         Serial.println(size);
         Serial.println("Well, I need more");
+        Serial.println("=======READING END=========");
         return read_result_t<_R>{
                 nullptr, ptr
         };
     }
-    Serial.println("Finish reading");
-    Serial.println("Now begin to check");
+    Serial.print("I have ");
+    Serial.print(ptr);
+    Serial.println(" byte(s) now");
+    Serial.println("Good, finish reading");
+    Serial.println("Now begin to check:");
+    print_buf(buffer, size);
     uint8_t check = 0;
     // 去掉最后一位（校验位）异或
-    for (auto i = static_cast<int>(ptr - 2); i >= 0; --i) {
+    for (auto i = static_cast<int>(ptr) - 2; i >= 0; --i) {
         check ^= buffer[i];
     }
-    Serial.print("Expect it is ");
+    Serial.print("Expect: ");
     Serial.println(buffer[ptr - 1]);
 
-    Serial.print("Actual it is ");
+    Serial.print("Actual: ");
     Serial.println(check);
     // 与最后一位对比
-    if (check != buffer[ptr - 1])
+    if (check != buffer[ptr - 1]) {
+        Serial.println("Checking failed, ready to receive new packets");
+        Serial.println("=======READING END=========");
         return read_result_t<_R>{
                 nullptr, 0
         };
-    Serial.println("Check finished");
+    }
+    Serial.println("Checking finished");
+    Serial.println("=======READING END=========");
+    Serial.println("It is time to handle callbacks");
     return read_result_t<_R>{
             f(), 0
     };
@@ -196,7 +212,7 @@ void receive_from_nano(HardwareSerial serial) {
     static uint8_t buffer[64];
     static size_t ptr = 0;
 
-    // 是否为新包
+    // 如果是新包
     if (ptr == 0) {
         while (true) {
             auto byte = serial.read();
@@ -208,17 +224,22 @@ void receive_from_nano(HardwareSerial serial) {
                 return;
             }
         }
+        // 类型
+        buffer[0] = serial.read();
+        Serial.println("A new packet has come (it may has been handled)");
+        Serial.print("Type: ");
+        Serial.println(buffer[0]);
+        // TODO: ???
+        if (buffer[0] == 0xff) {
+            ptr = 0;
+            Serial.println("wtf");
+            return;
+        }
+    } else {
+        Serial.println("Last packet is not finished, resume with it");
     }
 
-    // 类型
-    buffer[0] = serial.read();
-    // TODO: ???
-    if (buffer[0] == 0xff) {
-        ptr = 0;
-        return;
-    }
-    Serial.print("Type: ");
-    Serial.println(buffer[0]);
+
     switch (buffer[0]) {
         case TYPE_SPEED: {
             auto result = try_read<SPEED_SIZE, float *>(serial, buffer, ptr, []() {
@@ -238,10 +259,13 @@ void receive_from_nano(HardwareSerial serial) {
                 return states;
             });
             ptr = result.ptr;
+            // TODO magic
+            print_buf(static_cast<uint8_t *>(result.data),MOTOR_SIZE * sizeof(uint8_t));
             if (result.data != nullptr)
                 state_callback(result.data);
             break;
         }
+
 //        case TYPE_RESET: {
 //            auto result = try_read<RESET_SIZE, bool>(serial, buffer, ptr, [] { return true; });
 //            ptr = result.ptr;
@@ -255,13 +279,13 @@ void receive_from_nano(HardwareSerial serial) {
     }
 }
 
-void printBuf(uint8_t *buf, size_t size) {
-    Serial.println("=======================");
-    for (auto i = 0; i < size - 1; i++) {
+void print_buf(uint8_t *buf, size_t size) {
+    Serial.println("==========BUF==========");
+    for (auto i = 0; i < size; i++) {
         Serial.print(buf[i]);
         Serial.print(",");
     }
-    Serial.println("\n=======================");
+    Serial.println("\n==========BUF==========");
 }
 
 void speed_callback(const float *speeds) {
@@ -285,5 +309,9 @@ void setup() {
 
 void loop() {
     receive_from_nano(Serial1);
+//    auto x = Serial1.read();
+//    if (x != -1) {
+//        Serial.print(x);
+//    }
     delay(10);
 }
