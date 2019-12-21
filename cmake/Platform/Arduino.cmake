@@ -1906,7 +1906,8 @@ function(GENERATE_CPP_FROM_SKETCH MAIN_SKETCH_PATH SKETCH_SOURCES SKETCH_CPP)
 
         # Write function prototypes
         file(APPEND ${SKETCH_CPP} "\n//=== START Forward: ${SKETCH_SOURCE_PATH}\n")
-        foreach(SKETCH_PROTOTYPE ${SKETCH_PROTOTYPES})
+        # TODO WTF!!!!!!
+#[[        foreach(SKETCH_PROTOTYPE ${SKETCH_PROTOTYPES})
             string(REPLACE "\n" " " SKETCH_PROTOTYPE "${SKETCH_PROTOTYPE}")
             string(REPLACE "{" "" SKETCH_PROTOTYPE "${SKETCH_PROTOTYPE}")
             arduino_debug_msg("\tprototype: ${SKETCH_PROTOTYPE};")
@@ -1917,7 +1918,7 @@ function(GENERATE_CPP_FROM_SKETCH MAIN_SKETCH_PATH SKETCH_SOURCES SKETCH_CPP)
                 arduino_debug_msg("\trejected prototype: ${SKETCH_PROTOTYPE};")
             endif()
             file(APPEND ${SKETCH_CPP} "${SKETCH_PROTOTYPE};\n")
-        endforeach()
+        endforeach()]]
         file(APPEND ${SKETCH_CPP} "//=== END Forward: ${SKETCH_SOURCE_PATH}\n")
     endforeach()
 
