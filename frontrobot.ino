@@ -244,7 +244,7 @@ void receive_from_nano(HardwareSerial serial) {
         case TYPE_SPEED: {
             auto result = try_read<SPEED_SIZE, float *>(serial, buffer, ptr, []() {
                 float speeds[MOTOR_SIZE];
-                memcpy(buffer + 1, speeds, MOTOR_SIZE * sizeof(float));
+                memcpy(speeds, buffer + 1, MOTOR_SIZE * sizeof(float));
                 return speeds;
             });
             ptr = result.ptr;
@@ -255,12 +255,12 @@ void receive_from_nano(HardwareSerial serial) {
         case TYPE_STATE: {
             auto result = try_read<STATE_SIZE, motor_state_t *>(serial, buffer, ptr, []() {
                 motor_state_t states[MOTOR_SIZE];
-                memcpy(buffer + 1, states, MOTOR_SIZE * sizeof(uint8_t));
+                memcpy(states, buffer + 1, MOTOR_SIZE * sizeof(uint8_t));
                 return states;
             });
             ptr = result.ptr;
             // TODO magic
-            print_buf(static_cast<uint8_t *>(result.data),MOTOR_SIZE * sizeof(uint8_t));
+            print_buf(result.data, MOTOR_SIZE * sizeof(uint8_t));
             if (result.data != nullptr)
                 state_callback(result.data);
             break;
