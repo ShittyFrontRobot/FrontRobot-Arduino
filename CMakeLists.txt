@@ -7,13 +7,18 @@ set(${CMAKE_PROJECT_NAME}_SKETCH frontrobot.ino)
 
 #### Uncomment below additional settings as needed.
 set(${CMAKE_PROJECT_NAME}_BOARD mega)
-#IF (APPLE)
-#    set(${CMAKE_PROJECT_NAME}_PORT /dev/cu.usbmodem14A111)
-#ELSEIF (WIN32)
+
+IF (CMAKE_SYSTEM_NAME MATCHES "Windows")
     set(${CMAKE_PROJECT_NAME}_PORT COM15)
-#ENDIF ()
+ELSE ()
+    set(${CMAKE_PROJECT_NAME}_PORT /dev/cu.usbmodem14A111)
+ENDIF (CMAKE_SYSTEM_NAME MATCHES "Windows")
+
 set(mega.build.mcu atmega2560)
 set(mega.upload.protocol wiring)
 set(mega.upload.speed 115200)
 
-generate_arduino_firmware(${CMAKE_PROJECT_NAME})
+generate_arduino_firmware(
+        ${CMAKE_PROJECT_NAME}
+        HDRS motor.hpp logger.hpp
+)

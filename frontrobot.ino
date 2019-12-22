@@ -1,17 +1,17 @@
 #include <Arduino.h>
 #include "motor.hpp"
-
+#include "logger.hpp"
 
 #define MOTOR_SIZE 6
 
 #define TYPE_SPEED 0xA1
-// Motor size * 4 + 3 -1
+// Motor size * sizeOf(float) + 3(0xbc + type + check) - (0xbc)
 #define SPEED_SIZE 26
 #define TYPE_STATE 0xA3
-// Motor size * 1 + 3 -1
+// Motor size * sizeOf(byte) + 3(0xbc + type + check) - (0xbc)
 #define STATE_SIZE 8
 #define TYPE_RESET 0xA8
-// Motor size * 0 + 3 -1
+// Motor size * 0            + 3(0xbc + type + check) - (0xbc)
 #define RESET_SIZE 2
 
 void speed_callback(const float *);
@@ -19,8 +19,6 @@ void speed_callback(const float *);
 void state_callback(const motor_state_t *);
 
 void reset_callback();
-
-void print_buf(uint8_t *buf, size_t size);
 
 
 struct read_result_t {
@@ -30,51 +28,49 @@ struct read_result_t {
 
 template<size_t size>
 read_result_t try_read(HardwareSerial &serial, uint8_t *buffer, size_t ptr) {
-    Serial.println("=======READING START=======");
+    auto read_size = size - ptr;
+    println_debug("=======READING START=======");
     // 尝试读对应长度
-    Serial.print("I need read ");
-    Serial.print(size - ptr);
-    Serial.println(" byte(s) this time");
-    ptr += serial.readBytes(buffer + 1, size - ptr);
-    // 没读完下次再说
+    printf_debug("I need to read %d byte(s) this time.\n", read_size);
+    auto actual_size = serial.readBytes(buffer + 1, read_size);
+    printf_debug("And I got %d.\n", actual_size);
+
+    ptr += actual_size;
+
+    println_debug("Buffer: ");
+    print_buf_debug(buffer, 40);
+
+    // 没读完等下次
     if (ptr < size) {
-        Serial.print("I've got ");
-        Serial.print(ptr);
-        Serial.print(" byte(s) so far, but it should be ");
-        Serial.println(size);
-        Serial.println("Well, I need more");
-        Serial.println("=======READING END=========");
+        printf_debug("I've got %d byte(s) so far, but it should be %d.\n", ptr, size);
+        println_debug("Well, I need more.");
+        println_debug("=======READING END=========");
         return read_result_t{
                 false, ptr
         };
     }
-    Serial.print("I have ");
-    Serial.print(ptr);
-    Serial.println(" byte(s) now");
-    Serial.println("Good, finish reading");
-    Serial.println("Now begin to check:");
-    print_buf(buffer, size);
+    printf_debug("I have %d byte(s) of current packet now.\n", ptr);
+    println_debug("Good, finish reading.");
+    println_debug("Now begin to check:");
+    print_buf_debug(buffer, size);
     uint8_t check = 0;
     // 去掉最后一位（校验位）异或
     for (auto i = static_cast<int>(ptr) - 2; i >= 0; --i) {
         check ^= buffer[i];
     }
-    Serial.print("Expect: ");
-    Serial.println(buffer[ptr - 1]);
+    printf_debug("Expect: %d, Actual: %d.\n", buffer[ptr - 1], check);
 
-    Serial.print("Actual: ");
-    Serial.println(check);
     // 与最后一位对比
     if (check != buffer[ptr - 1]) {
-        Serial.println("Checking failed, ready to receive new packets");
-        Serial.println("=======READING END=========");
+        println_debug("Checking failed, ready to receive new packets.");
+        println_debug("=======READING END=========");
         return read_result_t{
                 false, 0
         };
     }
-    Serial.println("Checking finished");
-    Serial.println("=======READING END=========");
-    Serial.println("It is time to handle callbacks");
+    println_debug("Checking finished.");
+    println_debug("=======READING END=========");
+    println_debug("It is time to handle callbacks.");
     return read_result_t{
             true, 0
     };
@@ -95,19 +91,25 @@ void receive_from_nano(HardwareSerial &serial) {
                 return;
             }
         }
-        // 类型
+        // 拿到类型
         buffer[0] = serial.read();
-        Serial.println("A new packet has come");
-        Serial.print("Type: ");
-        Serial.println(buffer[0]);
-        // TODO: ???
-        if (buffer[0] == 0xbc) {
+        ptr += 1;
+        printf("A new packet has come, type: %d.\n", buffer[0]);
+
+        // 错了就扔掉
+        if (buffer[0] != TYPE_RESET && buffer[0] != TYPE_STATE && buffer[0] != TYPE_SPEED) {
             ptr = 0;
-            Serial.println("Error! the first byte can't be 0xff!");
+            println("Error! the first byte can't be 0xbc or 0xff or sth unknown!");
             return;
         }
+
+
     } else {
-        Serial.println("Last packet is not finished, resume with it");
+        // 如果没读出来等下次
+        if (serial.peek() == -1)
+            return;
+
+        println_debug("Current packet is not finished, resume with it.");
     }
 
 
@@ -143,42 +145,53 @@ void receive_from_nano(HardwareSerial &serial) {
     }
 }
 
-void print_buf(uint8_t *buf, size_t size) {
-    Serial.println("==========BUF==========");
-    for (auto i = 0; i < size; i++) {
-        Serial.print(buf[i]);
-        Serial.print(",");
-    }
-    Serial.println("\n==========BUF==========");
-}
+int i = 0;
+int last = i;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
 
 void speed_callback(const float *speeds) {
-    Serial.println("Motor speeds: ");
-    for (auto i = MOTOR_SIZE - 1; i >= 0; --i) {
-        Serial.println(speeds[i]);
-    }
+
+//    println("Motor speeds: ");
+//    for (auto i = MOTOR_SIZE - 1; i >= 0; --i) {
+//        println(speeds[i]);
+//    }
+    i++;
 }
 
 void state_callback(const uint8_t *states) {
-    Serial.println("Motor states: ");
-    for (auto i = MOTOR_SIZE - 1; i >= 0; --i) {
-        Serial.println(states[i]);
-    }
+//    println("Motor states: ");
+//    for (auto i = MOTOR_SIZE - 1; i >= 0; --i) {
+//        println(states[i]);
+//    }
+    ++i;
 }
 
 void reset_callback() {
-    Serial.println("reset");
+//    println("reset");
+    ++i;
 }
 
 void setup() {
     Serial.begin(9600);
     Serial1.begin(115200);
+    printf_begin();
+}
+
+void read_serial(HardwareSerial &serial) {
+    auto byte = Serial1.read();
+    if (byte != -1)
+        printf("%d\n", byte);
 }
 
 void loop() {
     receive_from_nano(Serial1);
-//    auto byte=Serial1.read();
-//    if(byte!=-1)
-//    Serial.println(byte);
-    delay(10);
+
+    if (i != last) {
+        printf("[result]\t%d\n", i);
+        last = i;
+    }
+
+    delay(5);
 }
