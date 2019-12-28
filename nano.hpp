@@ -96,7 +96,7 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
         // 拿到类型
         buffer[0] = serial.read();
         ptr += 1;
-        printf("A new packet has come, type: %d.\n", buffer[0]);
+        printf_debug("A new packet has come, type: %d.\n", buffer[0]);
 
         // 错了就扔掉
         if (buffer[0] != PACKET_TYPE_RESET && buffer[0] != TYPE_STATE && buffer[0] != PACKET_TYPE_SPEED) {
@@ -148,11 +148,15 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
 }
 
 void send_to_nano(HardwareSerial &serial, float *encoder_values) {
-    uint8_t payload[PACKET_ENCODER_SIZE];
+    uint8_t payload[PACKET_ENCODER_SIZE + 1];
     payload[0] = 0xbc;
     payload[1] = PACKET_TYPE_ENCODER;
+    payload[PACKET_ENCODER_SIZE] = 0;
     memcpy(payload + 2, encoder_values, MOTOR_SIZE * sizeof(float));
-
+    for (auto i = 1; i < PACKET_ENCODER_SIZE; ++i) {
+        payload[PACKET_ENCODER_SIZE] ^= payload[i];
+    }
+    serial.write(payload, PACKET_ENCODER_SIZE + 1);
 }
 
 #endif //FRONTROBOT_NANO_HPP

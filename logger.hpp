@@ -32,6 +32,9 @@ void printf_begin() {
 void println(const char *string) {
     printf("%s\n", string);
 }
+void print(const char *string) {
+    printf("%s", string);
+}
 
 void println_debug(const char *string) {
     printf_debug("%s\n", string);
@@ -50,6 +53,17 @@ void print_buf_debug(uint8_t *buf, size_t size) {
     }
 
     println_debug("\n==========BUF==========");
+}
+
+void print_buf(uint8_t *buf, size_t size) {
+    println("==========BUF==========");
+    for (auto i = 0; i < size; i++) {
+        printf("%d", buf[i]);
+        if (i != size - 1)
+            print(",");
+    }
+
+    println("\n==========BUF==========");
 }
 
 
