@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "nano.hpp"
 #include "motor.hpp"
+#include "stm.hpp"
 
 void setup() {
     Serial.begin(9600);
