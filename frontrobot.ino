@@ -15,7 +15,7 @@ void read_serial(HardwareSerial &serial) {
         printf("%d\n", byte);
 }
 
-static float s[]{3, 2, 3, 4, 5, 6};
+static int s[]{3, 2, 3, 4, 5, 6};
 
 void loop() {
     receive_from_nano(Serial1, [](float *a) {

@@ -91,12 +91,12 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
  * @param serial
  * @param encoder_values
  */
-void send_to_nano(HardwareSerial &serial, float *encoder_values) {
+void send_to_nano(HardwareSerial &serial, int *encoder_values) {
     uint8_t payload[PACKET_NANO_SIZE_ENCODER + 1];
     payload[0] = PACKET_HEAD;
     payload[1] = PACKET_NANO_TYPE_ENCODER;
     payload[PACKET_NANO_SIZE_ENCODER] = 0;
-    memcpy(payload + 2, encoder_values, MOTOR_SIZE * sizeof(float));
+    memcpy(payload + 2, encoder_values, MOTOR_SIZE * sizeof(int));
     for (auto i = 1; i < PACKET_NANO_SIZE_ENCODER; ++i) {
         payload[PACKET_NANO_SIZE_ENCODER] ^= payload[i];
     }
