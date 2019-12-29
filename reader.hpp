@@ -7,11 +7,22 @@
 
 #include "logger.hpp"
 
+/**
+ * 串口读取结果
+ */
 struct read_result_t {
     bool success;
     size_t ptr;
 };
 
+/**
+ * 读串口
+ * @tparam size 读取长度
+ * @param serial
+ * @param buffer
+ * @param ptr
+ * @return 新指针位置
+ */
 template<size_t size>
 read_result_t try_read(HardwareSerial &serial, uint8_t *buffer, size_t ptr) {
     auto read_size = size - ptr;

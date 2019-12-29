@@ -33,7 +33,12 @@ public:
     }
 };
 
-
+/**
+ * 电机内核
+ * 提供电机输出
+ * @tparam pin1 H 桥引脚
+ * @tparam pin2 H 桥引脚
+ */
 template<uint8_t pin1, uint8_t pin2>
 struct motor_core_t {
 
@@ -52,7 +57,7 @@ struct motor_core_t {
     }
 
     void pwm(int value) {
-        if (value > 0) {
+        if (value >= 0) {
             analogWrite(pin1, value);
             analogWrite(pin2, 0);
         } else {
@@ -64,20 +69,23 @@ struct motor_core_t {
 
 using motor_state_t = uint8_t;
 
-#define STATE_STOP 0x0
-#define STATE_BREAK 0x1
-#define STATE_SPEED 0x2
+#define MOTOR_STATE_STOP 0x0
+#define MOTOR_STATE_BREAK 0x1
+#define MOTOR_STATE_SPEED 0x2
 
-
+/**
+ * 电机
+ * 封装电机输出
+ * @tparam core 电机内核
+ */
 template<class core>
 class motor_t {
 private:
     bool close_loop = false;
-    short ticks = 0, last_ticks = 0;
+    int ticks = 0, last_ticks = 0;
     float current_speed = .0, target_speed = .0;
 public:
     pid_t pid;
-    float cpr = 1.0;
 
     void set_power(int power) {
         core::pwm(power / 255);
@@ -86,13 +94,13 @@ public:
     void set_state(uint8_t state) {
         close_loop = false;
         switch (state) {
-            case STATE_STOP:
+            case MOTOR_STATE_STOP:
                 core::state_stop();
                 break;
-            case STATE_BREAK:
+            case MOTOR_STATE_BREAK:
                 core::state_break();
                 break;
-            case STATE_SPEED:
+            case MOTOR_STATE_SPEED:
                 close_loop = true;
                 break;
             default:
@@ -105,7 +113,7 @@ public:
     }
 
     void run() {
-        current_speed = (ticks - last_ticks) / (cpr * 180.0) * PI;
+        current_speed = ticks - last_ticks;
         if (!close_loop)return;
         set_power(pid(target_speed - current_speed));
     }

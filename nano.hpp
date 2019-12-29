@@ -6,23 +6,15 @@
 #define FRONTROBOT_NANO_HPP
 
 #include "reader.hpp"
+#include "consts.hpp"
 
-#define MOTOR_SIZE 6
-
-#define PACKET_TYPE_SPEED 0xA1
-// Motor size * sizeOf(float) + 3(0xbc + type + check) - (0xbc)
-#define PACKET_SPEED_SIZE 26
-#define TYPE_STATE 0xA3
-// Motor size * sizeOf(byte) + 3(0xbc + type + check) - (0xbc)
-#define PACKET_STATE_SIZE 8
-#define PACKET_TYPE_RESET 0xA8
-// Motor size * 0            + 3(0xbc + type + check) - (0xbc)
-#define PACKET_RESET_SIZE 2
-#define PACKET_TYPE_ENCODER 0xA2
-// Motor size * sizeOf(float) + 3(0xbc + type + check) - (0xbc)
-#define PACKET_ENCODER_SIZE 26
-
-
+/**
+ * 来自 nano 的六电机速度、六电机状态、重置整体
+ * @param serial
+ * @param speed_callback
+ * @param state_callback
+ * @param reset_callback
+ */
 void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), void(*state_callback)(uint8_t *),
                        void(*reset_callback)()) {
     static uint8_t buffer[64];
@@ -33,7 +25,7 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
         while (true) {
             auto byte = serial.read();
             // 前进到头为止
-            if (byte == 0xbc) {
+            if (byte == PACKET_HEAD) {
                 break;
             } else if (byte == -1) {
                 return;
@@ -45,9 +37,10 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
         printf_debug("A new packet has come, type: %d.\n", buffer[0]);
 
         // 错了就扔掉
-        if (buffer[0] != PACKET_TYPE_RESET && buffer[0] != TYPE_STATE && buffer[0] != PACKET_TYPE_SPEED) {
+        if (buffer[0] != PACKET_NANO_TYPE_RESET && buffer[0] != PACKET_NANO_TYPE_STATE &&
+            buffer[0] != PACKET_NANO_TYPE_SPEED) {
             ptr = 0;
-            println("Error! the first byte can't be 0xbc or 0xff or sth unknown!");
+            println("Error! Unknown packet type!");
             return;
         }
 
@@ -62,8 +55,8 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
 
 
     switch (buffer[0]) {
-        case PACKET_TYPE_SPEED: {
-            auto result = try_read<PACKET_SPEED_SIZE>(serial, buffer, ptr);
+        case PACKET_NANO_TYPE_SPEED: {
+            auto result = try_read<PACKET_NANO_SIZE_SPEED>(serial, buffer, ptr);
             ptr = result.ptr;
             if (result.success) {
                 float speeds[MOTOR_SIZE];
@@ -72,8 +65,8 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
             }
             break;
         }
-        case TYPE_STATE: {
-            auto result = try_read<PACKET_STATE_SIZE>(serial, buffer, ptr);
+        case PACKET_NANO_TYPE_STATE: {
+            auto result = try_read<PACKET_NANO_SIZE_STATE>(serial, buffer, ptr);
             ptr = result.ptr;
             if (result.success) {
                 uint8_t states[MOTOR_SIZE];
@@ -83,8 +76,8 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
             break;
         }
 
-        case PACKET_TYPE_RESET: {
-            auto result = try_read<PACKET_RESET_SIZE>(serial, buffer, ptr);
+        case PACKET_NANO_TYPE_RESET: {
+            auto result = try_read<PACKET_NANO_SIZE_RESET>(serial, buffer, ptr);
             ptr = result.ptr;
             if (result.success)
                 reset_callback();
@@ -93,16 +86,21 @@ void receive_from_nano(HardwareSerial &serial, void (*speed_callback)(float *), 
     }
 }
 
+/**
+ * 发给 nano 的六编码器脉冲
+ * @param serial
+ * @param encoder_values
+ */
 void send_to_nano(HardwareSerial &serial, float *encoder_values) {
-    uint8_t payload[PACKET_ENCODER_SIZE + 1];
-    payload[0] = 0xbc;
-    payload[1] = PACKET_TYPE_ENCODER;
-    payload[PACKET_ENCODER_SIZE] = 0;
+    uint8_t payload[PACKET_NANO_SIZE_ENCODER + 1];
+    payload[0] = PACKET_HEAD;
+    payload[1] = PACKET_NANO_TYPE_ENCODER;
+    payload[PACKET_NANO_SIZE_ENCODER] = 0;
     memcpy(payload + 2, encoder_values, MOTOR_SIZE * sizeof(float));
-    for (auto i = 1; i < PACKET_ENCODER_SIZE; ++i) {
-        payload[PACKET_ENCODER_SIZE] ^= payload[i];
+    for (auto i = 1; i < PACKET_NANO_SIZE_ENCODER; ++i) {
+        payload[PACKET_NANO_SIZE_ENCODER] ^= payload[i];
     }
-    serial.write(payload, PACKET_ENCODER_SIZE + 1);
+    serial.write(payload, PACKET_NANO_SIZE_ENCODER + 1);
 }
 
 #endif //FRONTROBOT_NANO_HPP
