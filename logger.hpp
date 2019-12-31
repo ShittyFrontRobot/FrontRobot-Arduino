@@ -12,13 +12,13 @@
 #ifdef PRINT
 #define printf_debug(...)  printf(__VA_ARGS__)
 #else
-#define printf_debug(...) foo()
+#define printf_debug(...) __WDNMD__()
 #endif
 
 /**
  * 孤儿
  */
-void foo() {
+void __WDNMD__() {
     // Nothing to do
 }
 

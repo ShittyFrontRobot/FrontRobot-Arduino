@@ -5,36 +5,34 @@
 #ifndef FRONTROBOT_CONSTS_HPP
 #define FRONTROBOT_CONSTS_HPP
 
-#define MOTOR_SIZE 6
-#define PACKET_HEAD 0xbc
+#include "ArduinoSTL.h"
 
-//region NANO
+constexpr static size_t motor_size = 6;
+constexpr static uint8_t packet_head = 0xbc;
 
-#define PACKET_NANO_TYPE_SPEED 0xA1
-// Motor size * sizeOf(float) + 3(0xbc + type + check) - (0xbc)
-#define PACKET_NANO_SIZE_SPEED 26
-#define PACKET_NANO_TYPE_STATE 0xA3
-// Motor size * sizeOf(byte) +  3(0xbc + type + check) - (0xbc)
-#define PACKET_NANO_SIZE_STATE 8
-#define PACKET_NANO_TYPE_RESET 0xA8
-// Motor size * 0            +  3(0xbc + type + check) - (0xbc)
-#define PACKET_NANO_SIZE_RESET 2
-#define PACKET_NANO_TYPE_ENCODER 0xA2
-// Motor size * sizeOf(float) + 3(0xbc + type + check) - (0xbc)
-#define PACKET_NANO_SIZE_ENCODER 26
+struct packet_info_t {
+    const uint8_t type;
+    const size_t size;
 
-//endregion
+    constexpr size_t size_except_head() const { return size - 1; }
+};
 
-//region STM
 
-#define PACKET_STM_TYPE_ENCODER 13
-// Motor size /2 * sizeOf(float) + 3(0xbc + type + check) - (0xbc)
-#define PACKET_STM_SIZE_ENCODER 14
+namespace nano {
 
-#define PACKET_STM_TYPE_RESET 3
-// Motor size * 0                + 3(0xbc + type + check) - (0xbc)
-#define PACKET_STM_SIZE_RESET 4
+    constexpr static packet_info_t
+            motor_speed_packet_info{0xA1, 27},
+            motor_state_packet_info{0xA3, 9},
+            encoder_data_packet_info{0xA2, 27},
+            encoder_reset_packet_info{0xA8, 27};
 
-//endregion
+}
+
+namespace stm {
+    constexpr static packet_info_t
+            encoder_data_packet_info{0x0D, 14},
+            encoder_reset_packet_info{0x03, 4};
+}
+
 
 #endif //FRONTROBOT_CONSTS_HPP

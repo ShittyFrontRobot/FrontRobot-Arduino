@@ -21,4 +21,5 @@ set(mega.upload.speed 115200)
 generate_arduino_firmware(
         ${CMAKE_PROJECT_NAME}
         HDRS motor.hpp logger.hpp nano.hpp stm.hpp consts.hpp
+        parser.hpp
 )

@@ -56,7 +56,7 @@ struct motor_core_t {
         digitalWrite(pin2, HIGH);
     }
 
-    void pwm(int value) {
+    void pwm(int32_t value) {
         if (value >= 0) {
             analogWrite(pin1, value);
             analogWrite(pin2, 0);
@@ -67,11 +67,10 @@ struct motor_core_t {
     }
 };
 
-using motor_state_t = uint8_t;
+enum class motor_state_t : uint8_t {
+    stop, braking, speed
+};
 
-#define MOTOR_STATE_STOP 0x0
-#define MOTOR_STATE_BREAK 0x1
-#define MOTOR_STATE_SPEED 0x2
 
 /**
  * 电机
@@ -82,7 +81,7 @@ template<class core>
 class motor_t {
 private:
     bool close_loop = false;
-    int ticks = 0, last_ticks = 0;
+    int32_t ticks = 0, last_ticks = 0;
     float current_speed = .0, target_speed = .0;
 public:
     pid_t pid;
@@ -91,16 +90,16 @@ public:
         core::pwm(power / 255);
     }
 
-    void set_state(uint8_t state) {
+    void set_state(motor_state_t state) {
         close_loop = false;
         switch (state) {
-            case MOTOR_STATE_STOP:
+            case motor_state_t::stop :
                 core::state_stop();
                 break;
-            case MOTOR_STATE_BREAK:
+            case motor_state_t::braking:
                 core::state_break();
                 break;
-            case MOTOR_STATE_SPEED:
+            case motor_state_t::speed:
                 close_loop = true;
                 break;
             default:
