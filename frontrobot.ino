@@ -37,15 +37,20 @@ void run() {
     nano::send_to(Serial1, s);
 }
 
+
 static uint8_t encoder_reset_packet[] = {188, 168, 168};
 static uint8_t motor_speed_packet[] = {188, 161, 0, 0, 128, 63, 0, 0, 0, 64, 0, 0,
                                        64, 64, 0, 0, 128, 64, 0, 0, 160, 64,
                                        0, 0, 192, 64, 254};
 
+static uint8_t motor_state_packet[] = {188, 163, 1, 1, 1, 1, 1, 1, 163};
+
+
 void foo() {
     parse_engine_t<nano::parser_t> engine;
-    engine(encoder_reset_packet, encoder_reset_packet + 3, [](nano::parser_t::result_t &result) {
-        printf("%d\n", static_cast<uint8_t >(result.type));
+    engine(motor_speed_packet, motor_speed_packet + sizeof(motor_speed_packet), [](nano::parser_t::result_t &result) {
+        printf("result: %d\n", static_cast<uint8_t>(result.type));
+//        auto x = reinterpret_cast<float *>(result.speeds.data);
     });
 }
 

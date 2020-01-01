@@ -6,7 +6,6 @@
 #define FRONTROBOT_PARSER_HPP
 
 #include <ArduinoSTL.h>
-#include <func_exception>
 #include <deque>
 #include <numeric>
 #include "consts.hpp"
@@ -44,9 +43,14 @@ private:
 enum class result_type_t : uint8_t {
     success, failed, nothing
 };
+
 template<size_t size>
 struct packet_t {
-    uint8_t data[size];
+    uint8_t
+            head,
+            type,
+            data[size - 3],
+            check;
 };
 
 template<class iterator_t>
@@ -71,7 +75,7 @@ namespace nano {
             result_type_t type;
 
             union {
-                word_t bytes[sizeof(motor_speed_packet_t) - 3];
+                word_t bytes[sizeof(motor_speed_packet_t)];
                 motor_speed_packet_t speeds;
                 motor_state_packet_t states;
                 encoder_reset_packet_t reset;
@@ -91,11 +95,14 @@ namespace nano {
              */
         template<class iterator_t>
         result_t operator()(iterator_t &begin, iterator_t &end) const {
+            // TODO: ???
+            printf("first: %d\n",*begin);
             while (*begin++ != packet_head);
             result_t result{result_type_t::nothing, {packet_head, *begin--}};
-
+            auto next = *++begin;
+            printf("next: %d\n",next);
             packet_info_t const *info;
-            switch (*begin++) {
+            switch (next) {
                 case motor_speed_packet_info.type:
                     info = &motor_speed_packet_info;
                     break;
@@ -108,11 +115,11 @@ namespace nano {
                 default:
                     return result;
             }
-            auto size = info->size;
+            auto size = info->size_except_head();
             if (end - begin < size) return result;
             auto frame_end = begin + size;
-            if (xor_check(begin + 1, frame_end)) {
-                std::copy(begin + 2, frame_end - 1, result.bytes + 2);
+            if (xor_check(begin, frame_end)) {
+                std::copy(begin - 1, frame_end, result.bytes);
                 result.type = result_type_t::success;
                 result.info = info;
                 begin = frame_end;
